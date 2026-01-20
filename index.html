@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AX Shops Authentication Scanner</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>AX Shops Authentication Scanner</h1>
+
+  <!-- Token input (hidden after unlock) -->
+  <section id="token-input">
+    <label>Enter scanner token:</label>
+    <input type="text" id="token" placeholder="abc-123">
+    <button id="unlock-btn">Unlock</button>
+    <p id="token-error" class="error"></p>
+  </section>
+
+  <!-- Step indicator -->
+  <div id="step-indicator">Step <span id="current-step">1</span> of 7</div>
+
+  <!-- Step content -->
+  <section id="scanner" class="hidden">
+    <h2 id="step-title">Confirm or scan Order ID</h2>
+
+    <!-- Camera -->
+    <video id="camera" autoplay playsinline></video>
+    <canvas id="canvas" class="hidden"></canvas>
+
+    <!-- Controls -->
+    <button id="capture-btn">Capture</button>
+    <button id="retake-btn" class="hidden">Retake</button>
+    <button id="next-btn" class="hidden" disabled>Next</button>
+
+    <!-- Preview -->
+    <img id="preview" class="hidden" alt="Preview">
+
+    <!-- Submit -->
+    <button id="submit-btn" class="hidden" disabled>Submit</button>
+  </section>
+
+  <!-- Success -->
+  <section id="success" class="hidden">
+    <h2>✅ Authentication Submitted</h2>
+    <p>You may now return to Discord.</p>
+  </section>
+
+  <script src="scanner.js"></script>
+</body>
+</html>
