@@ -93,5 +93,6 @@ async def upload(
 
     return UploadResponse(status="uploaded", scans_completed=True)
 
-# Vercel handler
-handler = app
+# Vercel serverless function handler
+from mangum import Mangum
+handler = Mangum(app)
