@@ -1,7 +1,4 @@
 // ---------- CONFIG ----------
-const USE_BACKEND = true;  // Set to true when you have a backend URL
-const BACKEND_URL = "https://ax-shops-authenticator-scanner.vercel.app/api";  // Update with your live backend domain
-
 const CATEGORY = new URLSearchParams(window.location.search).get("category") || "shoes"; // shoes|clothing|accessories (default: shoes)
 
 const STEPS = {
