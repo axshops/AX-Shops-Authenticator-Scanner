@@ -15,7 +15,14 @@ SUPABASE_KEY   = os.getenv("SUPABASE_KEY")
 SCAN_DB        = "scans"
 TOKEN_DB       = "scan_tokens"
 EXPIRE_MIN     = 60
-backend = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Initialize Supabase client only if credentials are available
+backend = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        backend = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        print(f"Failed to initialize Supabase: {e}")
 
 # ---------- CORS ----------
 app.add_middleware(
@@ -35,8 +42,14 @@ class UploadResponse(BaseModel):
     scans_completed: bool
 
 # ---------- ENDPOINTS ----------
+@app.get("/")
+def read_root():
+    return {"status": "ok", "message": "AX Shops Authentication Scanner API"}
+
 @app.get("/validate-token", response_model=ValidateResponse)
 def validate_token(token: str):
+    if not backend:
+        raise HTTPException(status_code=500, detail="Database not configured")
     res = backend.table(TOKEN_DB).select("*").eq("token", token).single().execute()
     if not res.data or res.data["used"] or dt.datetime.utcnow() > dt.datetime.fromisoformat(res.data["expires_at"]):
         return ValidateResponse(valid=False)
@@ -47,6 +60,8 @@ async def upload(
     token: str = Form(...),
     step1: UploadFile = File(...),
     step2: UploadFile = File(...),
+    if not backend:
+        raise HTTPException(status_code=500, detail="Database not configured")
     step3: UploadFile = File(...),
     step4: UploadFile = File(...),
     step5: UploadFile = File(...),
