@@ -66,35 +66,13 @@ window.addEventListener("beforeunload", (e) => {
 
 // ---------- TOKEN UNLOCK ----------
 unlockBtn.addEventListener("click", async () => {
-  if (USE_BACKEND) {
-    token = tokenField.value.trim();
-    if (!token) {
-      tokenError.textContent = "Token required";
-      return;
-    }
-    const valid = await validateToken(token);
-    if (!valid) {
-      tokenError.textContent = "Invalid or expired token";
-      return;
-    }
-  } else {
-    // No backend - skip token requirement
-    token = tokenField.value.trim() || "offline-mode";
-  }
+  // No backend - skip token requirement
+  token = tokenField.value.trim() || "offline-mode";
   
   tokenInput.classList.add("hidden");
   scanner.classList.remove("hidden");
   startCamera();
 });
-
-async function validateToken(tok) {
-  try {
-    const res = await fetch(`${BACKEND_URL}/validate-token?token=${tok}`);
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
 
 // ---------- CAMERA ----------
 async function startCamera() {
@@ -195,53 +173,31 @@ submitBtn.addEventListener("click", async () => {
 
   submitBtn.disabled = true;
 
-  if (USE_BACKEND) {
-    // Send to backend
-    const form = new FormData();
-    form.append("token", token);
-    form.append("category", CATEGORY);
-    images.forEach((img, idx) => form.append(`step${idx + 1}`, img.file));
+  // Local mode - save to localStorage and download
+  const scanData = {
+    token,
+    category: CATEGORY,
+    timestamp: new Date().toISOString(),
+    imageCount: images.length,
+    images: images.map(img => ({
+      step: img.step,
+      label: img.label,
+      hash: img.hash,
+      size: img.file.size
+    }))
+  };
 
-    try {
-      const res = await fetch(`${BACKEND_URL}/upload`, { method: "POST", body: form });
-      if (res.ok) {
-        scanner.classList.add("hidden");
-        success.classList.remove("hidden");
-      } else {
-        alert("Upload failed – try again");
-        submitBtn.disabled = false;
-      }
-    } catch (e) {
-      alert("Network error – try again");
-      submitBtn.disabled = false;
-    }
-  } else {
-    // Offline mode - save to localStorage and download
-    const scanData = {
-      token,
-      category: CATEGORY,
-      timestamp: new Date().toISOString(),
-      imageCount: images.length,
-      images: images.map(img => ({
-        step: img.step,
-        label: img.label,
-        hash: img.hash,
-        size: img.file.size
-      }))
-    };
+  // Save metadata to localStorage
+  localStorage.setItem(`scan_${Date.now()}`, JSON.stringify(scanData));
 
-    // Save metadata to localStorage
-    localStorage.setItem(`scan_${Date.now()}`, JSON.stringify(scanData));
-
-    // Download images as a ZIP (or just show success)
-    scanner.classList.add("hidden");
-    success.classList.remove("hidden");
-    success.innerHTML = `
-      <h2>✅ Scan Completed</h2>
-      <p>${images.length} images captured for ${CATEGORY}</p>
-      <p style="font-size: 0.9rem; color: #666;">Saved locally. You can download individual images or integrate a backend when ready.</p>
-    `;
-  }
+  // Download images as a ZIP (or just show success)
+  scanner.classList.add("hidden");
+  success.classList.remove("hidden");
+  success.innerHTML = `
+    <h2>✅ Scan Completed</h2>
+    <p>${images.length} images captured for ${CATEGORY}</p>
+    <p style="font-size: 0.9rem; color: #666;">Saved locally. You can download individual images or integrate a backend when ready.</p>
+  `;
 });
 
 // ---------- HASH ----------
