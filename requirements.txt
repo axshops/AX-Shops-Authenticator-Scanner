@@ -3,3 +3,4 @@ python-multipart
 supabase
 httpx
 pydantic
+mangum
