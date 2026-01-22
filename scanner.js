@@ -1,4 +1,5 @@
 // ---------- CONFIG ----------
+const API_URL = window.location.origin + "/api";
 const CATEGORY = new URLSearchParams(window.location.search).get("category") || "shoes"; // shoes|clothing|accessories (default: shoes)
 
 const STEPS = {
@@ -63,12 +64,36 @@ window.addEventListener("beforeunload", (e) => {
 
 // ---------- TOKEN UNLOCK ----------
 unlockBtn.addEventListener("click", async () => {
-  // No backend - skip token requirement
-  token = tokenField.value.trim() || "offline-mode";
-  
-  tokenInput.classList.add("hidden");
-  scanner.classList.remove("hidden");
-  startCamera();
+  const inputToken = tokenField.value.trim();
+  if (!inputToken) {
+    tokenError.textContent = "Token required";
+    return;
+  }
+
+  tokenError.textContent = "";
+  unlockBtn.disabled = true;
+  unlockBtn.textContent = "Validating...";
+
+  try {
+    const res = await fetch(`${API_URL}/validate-token?token=${encodeURIComponent(inputToken)}`);
+    const data = await res.json();
+
+    if (!data.valid) {
+      tokenError.textContent = "Invalid or expired token";
+      unlockBtn.disabled = false;
+      unlockBtn.textContent = "Unlock";
+      return;
+    }
+
+    token = inputToken;
+    tokenInput.classList.add("hidden");
+    scanner.classList.remove("hidden");
+    startCamera();
+  } catch (err) {
+    tokenError.textContent = "Connection error. Please try again.";
+    unlockBtn.disabled = false;
+    unlockBtn.textContent = "Unlock";
+  }
 });
 
 // ---------- CAMERA ----------
@@ -169,32 +194,34 @@ submitBtn.addEventListener("click", async () => {
   }
 
   submitBtn.disabled = true;
+  submitBtn.textContent = "Uploading...";
 
-  // Local mode - save to localStorage and download
-  const scanData = {
-    token,
-    category: CATEGORY,
-    timestamp: new Date().toISOString(),
-    imageCount: images.length,
-    images: images.map(img => ({
-      step: img.step,
-      label: img.label,
-      hash: img.hash,
-      size: img.file.size
-    }))
-  };
+  try {
+    const formData = new FormData();
+    formData.append("token", token);
+    
+    images.forEach((img, idx) => {
+      formData.append(`step${idx + 1}`, img.file);
+    });
 
-  // Save metadata to localStorage
-  localStorage.setItem(`scan_${Date.now()}`, JSON.stringify(scanData));
+    const res = await fetch(`${API_URL}/upload`, {
+      method: "POST",
+      body: formData
+    });
 
-  // Download images as a ZIP (or just show success)
-  scanner.classList.add("hidden");
-  success.classList.remove("hidden");
-  success.innerHTML = `
-    <h2>✅ Scan Completed</h2>
-    <p>${images.length} images captured for ${CATEGORY}</p>
-    <p style="font-size: 0.9rem; color: #666;">Saved locally. You can download individual images or integrate a backend when ready.</p>
-  `;
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Upload failed");
+    }
+
+    scanner.classList.add("hidden");
+    success.classList.remove("hidden");
+  } catch (err) {
+    alert(`Upload failed: ${err.message}`);
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Submit";
+  }
 });
 
 // ---------- HASH ----------
