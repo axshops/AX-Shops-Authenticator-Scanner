@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Order {
+  id       String   @id
+  status   String
+  lockedAt DateTime?
+  scans    Scan[]
+  photos   Photo[]
+  decisions Decision[]
+}
+
+model Authenticator {
+  id    String @id
+  email String
+}
+
+model Scan {
+  id              String   @id @default(uuid())
+  orderId         String
+  authenticatorId String
+  componentType   String
+  scanValue       String
+  deviceMetadata  Json
+  createdAt       DateTime @default(now())
+}
+
+model Photo {
+  id              String   @id @default(uuid())
+  orderId         String
+  authenticatorId String
+  category        String
+  url             String
+  createdAt       DateTime @default(now())
+}
+
+model Decision {
+  id              String   @id @default(uuid())
+  orderId         String
+  authenticatorId String
+  decision        String
+  createdAt       DateTime @default(now())
+}
