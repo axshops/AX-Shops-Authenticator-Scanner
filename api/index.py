@@ -115,7 +115,3 @@ async def upload(
     backend.table("orders").update({"scans_completed": True, "status": "authentication_submitted"}).eq("order_id", order_id).execute()
     
     return UploadResponse(status="uploaded", scans_completed=True)
-
-# Vercel serverless function handler
-from mangum import Mangum
-handler = Mangum(app)
