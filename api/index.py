@@ -1,22 +1,13 @@
-from fastapi import FastAPI, HTTPException, File, Form, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import uuid
-import datetime as dt
+from http.server import BaseHTTPRequestHandler
+import json
 import os
-import httpx
 from supabase import create_client
 
-app = FastAPI(title="AX Shops Authentication Scanner", version="1.0")
-
 # ---------- CONFIG ----------
-SUPABASE_URL   = os.getenv("SUPABASE_URL")
-SUPABASE_KEY   = os.getenv("SUPABASE_KEY")
-SCAN_DB        = "scans"
-TOKEN_DB       = "scan_tokens"
-EXPIRE_MIN     = 60
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# Initialize Supabase client only if credentials are available
+# Initialize Supabase client
 backend = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
@@ -24,94 +15,44 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         print(f"Failed to initialize Supabase: {e}")
 
-# ---------- CORS ----------
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # restrict in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
-# ---------- MODELS ----------
-class ValidateResponse(BaseModel):
-    valid: bool
+class handler(BaseHTTPRequestHandler):
+    def _set_headers(self, status=200, content_type="application/json"):
+        self.send_response(status)
+        self.send_header("Content-type", content_type)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "*")
+        self.end_headers()
 
-class UploadResponse(BaseModel):
-    status: str
-    scans_completed: bool
+    def do_OPTIONS(self):
+        self._set_headers(204)
 
-# ---------- ENDPOINTS ----------
-@app.get("/")
-def read_root():
-    return {"status": "ok", "message": "AX Shops Authentication Scanner API"}
+    def do_GET(self):
+        if self.path == "/" or self.path == "/api" or self.path == "/api/":
+            self._set_headers()
+            response = {
+                "status": "ok",
+                "message": "AX Shops Authentication Scanner API"
+            }
+            self.wfile.write(json.dumps(response).encode())
+        
+        elif self.path == "/api/health":
+            self._set_headers()
+            response = {
+                "status": "ok",
+                "database": "connected" if backend else "not configured"
+            }
+            self.wfile.write(json.dumps(response).encode())
+        
+        else:
+            self._set_headers(404)
+            self.wfile.write(json.dumps({"error": "Not found"}).encode())
 
-@app.get("/health")
-def health_check():
-    return {
-        "status": "ok",
-        "database": "connected" if backend else "not configured"
-    }
+    def do_POST(self):
+        self._set_headers(405)
+        self.wfile.write(json.dumps({"error": "Method not allowed on this endpoint"}).encode())
 
-@app.get("/validate-token", response_model=ValidateResponse)
-def validate_token(token: str):
-    if not backend:
-        raise HTTPException(status_code=500, detail="Database not configured")
-    res = backend.table(TOKEN_DB).select("*").eq("token", token).single().execute()
-    if not res.data or res.data["used"] or dt.datetime.utcnow() > dt.datetime.fromisoformat(res.data["expires_at"]):
-        return ValidateResponse(valid=False)
-    return ValidateResponse(valid=True)
-
-@app.post("/upload", response_model=UploadResponse)
-async def upload(
-    token: str = Form(...),
-    step1: UploadFile = File(...),
-    step2: UploadFile = File(...),
-    step3: UploadFile = File(...),
-    step4: UploadFile = File(...),
-    step5: UploadFile = File(...),
-    step6: UploadFile = File(...),
-    step7: UploadFile = File(...)
-):
-    if not backend:
-        raise HTTPException(status_code=500, detail="Database not configured")
-    
-    # validate token
-    res = backend.table(TOKEN_DB).select("*").eq("token", token).single().execute()
-    if not res.data or res.data["used"]:
-        raise HTTPException(status_code=401, detail="Token invalid or already used")
-
-    order_id = res.data["order_id"]
-    files = [step1, step2, step3, step4, step5, step6, step7]
-    uploads = []
-
-    for idx, file in enumerate(files, 1):
-        if not file.content_type.startswith("image/"):
-            raise HTTPException(status_code=400, detail=f"Step {idx} is not an image")
-        ext = os.path.splitext(file.filename)[1].lower()
-        if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
-            raise HTTPException(status_code=400, detail=f"Step {idx} invalid extension")
-
-        # upload to Supabase storage
-        path = f"scans/{order_id}/step{idx}{ext}"
-        backend.storage.from_("scans").upload(path=path, file=file.file, file_options={"content-type": file.content_type})
-        url = backend.storage.from_("scans").get_public_url(path)
-        uploads.append(url)
-
-    # mark token used
-    backend.table(TOKEN_DB).update({"used": True}).eq("token", token).execute()
-
-    # store each step
-    for idx, url in enumerate(uploads, 1):
-        backend.table(SCAN_DB).insert({
-            "token": token,
-            "order_id": order_id,
-            "step": idx,
-            "image_url": url,
-            "hash": "phash_placeholder"  # backend can compute
-        }).execute()
-
-    # unlock order
-    backend.table("orders").update({"scans_completed": True, "status": "authentication_submitted"}).eq("order_id", order_id).execute()
-    
-    return UploadResponse(status="uploaded", scans_completed=True)
+    def do_POST(self):
+        self._set_headers(405)
+        self.wfile.write(json.dumps({"error": "Method not allowed on this endpoint"}).encode())
