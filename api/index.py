@@ -29,7 +29,7 @@ class handler(BaseHTTPRequestHandler):
         self._set_headers(204)
 
     def do_GET(self):
-        if self.path == "/" or self.path == "/api" or self.path == "/api/":
+        if self.path == "/api" or self.path == "/api/":
             self._set_headers()
             response = {
                 "status": "ok",
