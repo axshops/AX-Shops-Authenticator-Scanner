@@ -46,6 +46,13 @@ class UploadResponse(BaseModel):
 def read_root():
     return {"status": "ok", "message": "AX Shops Authentication Scanner API"}
 
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "database": "connected" if backend else "not configured"
+    }
+
 @app.get("/validate-token", response_model=ValidateResponse)
 def validate_token(token: str):
     if not backend:
@@ -60,14 +67,15 @@ async def upload(
     token: str = Form(...),
     step1: UploadFile = File(...),
     step2: UploadFile = File(...),
-    if not backend:
-        raise HTTPException(status_code=500, detail="Database not configured")
     step3: UploadFile = File(...),
     step4: UploadFile = File(...),
     step5: UploadFile = File(...),
     step6: UploadFile = File(...),
     step7: UploadFile = File(...)
 ):
+    if not backend:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    
     # validate token
     res = backend.table(TOKEN_DB).select("*").eq("token", token).single().execute()
     if not res.data or res.data["used"]:
@@ -105,8 +113,9 @@ async def upload(
 
     # unlock order
     backend.table("orders").update({"scans_completed": True, "status": "authentication_submitted"}).eq("order_id", order_id).execute()
-
+    
     return UploadResponse(status="uploaded", scans_completed=True)
 
-# Export app as handler for Vercel
-app = app
+# Vercel serverless function handler
+from mangum import Mangum
+handler = Mangum(app)
